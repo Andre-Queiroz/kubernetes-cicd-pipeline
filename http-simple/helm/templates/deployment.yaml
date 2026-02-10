@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-simple
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: http-simple
+  template:
+    metadata:
+      labels:
+        app: http-simple
+    spec:
+      containers:
+        - name: http-simple
+          image: nginx:{{ .Values.image.hash }}
+          envFrom:
+            - configMapRef:
+                name: http-simple-env
+          ports:
+            - name: http
+              containerPort: 3000
+          volumeMounts:
+            - name: certificate
+              mountPath: /etc/ssl/certs/http-simple
+            - name: key
+              mountPath: /etc/sss/keys/http-simple
+      volumes:
+        - name: certificate
+          configMap:
+            name: http-simple-certificate
+        - name: key
+          secret:
+            secretName: http-simple-key

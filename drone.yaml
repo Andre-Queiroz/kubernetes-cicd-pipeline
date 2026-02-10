@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: drone
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: drone
+  namespace: drone
+spec:
+  rules:
+    - host: drone.pipeline.localhost
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: drone
+                port:
+                  name: http
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: drone
+  namespace: drone
+spec:
+  selector:
+    app: drone
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: drone
+  namespace: drone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: drone
+  template:
+    metadata:
+      labels:
+        app: drone
+    spec:
+      containers:
+        - name: drone
+          image: drone/drone:2.26
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            - name: DRONE_GITEA_CLIENT_ID
+              value: 42ebef2c-16c5-430f-a4e5-1c40dd77052d
+            - name: DRONE_GITEA_CLIENT_SECRET
+              value: gto_fqpd2qf2i4ihvrbug72yw67rycuyluxcm5yv3hqtv7hhkyzgqmyq
+            - name: DRONE_GITEA_SERVER
+              value: http://gitea.src.control.localhost
+            - name: DRONE_RPC_SECRET
+              value: d507a8a7d515f343a6f9caed4f370883
+            - name: DRONE_SERVER_HOST
+              value: drone.pipeline.localhost
+            - name: DRONE_SERVER_PROTO
+              value: http
+            - name: DRONE_USER_CREATE
+              value: username:root,admin:true
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      hostAliases:
+        - ip: 172.21.0.2
+          hostnames:
+            - gitea.src.control.localhost
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

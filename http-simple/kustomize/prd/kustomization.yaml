@@ -1,0 +1,20 @@
+resources:
+  - ../hom
+
+namespace: http-simple-prd
+
+patchesStrategicMerge:
+  - deployment.yaml
+  - service.yaml
+
+secretGenerator:
+  - name: http-simple-key
+    behavior: replace
+    files:
+      - assets/key.pem
+
+configMapGenerator:
+  - name: http-simple-certificate
+    behavior: replace
+    files:
+      - assets/certificate.pem

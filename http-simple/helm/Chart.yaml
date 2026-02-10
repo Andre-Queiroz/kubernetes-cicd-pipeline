@@ -1,0 +1,3 @@
+apiVersion: v2
+name: http-simple
+version: "1.0.0-alpha0"

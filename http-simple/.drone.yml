@@ -1,0 +1,59 @@
+kind: pipeline
+type: kubernetes
+name: cicd
+
+services:
+  - name: dockerd
+    image: docker:28-dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - name: certs
+        path: /etc/ssl/certs
+    commands:
+      - dockerd-entrypoint.sh --insecure-registry=local-registry:5000
+
+steps:
+  - name: install
+    image: golang:1.25-alpine
+    commands:
+      - go mod download
+
+  - name: test
+    image: golang:1.25-alpine
+    commands:
+      - go test
+
+  - name: build
+    image: docker:28-cli
+    depends_on:
+      - dockerd
+    environment:
+      DOCKER_HOST: tcp://0.0.0.0:2375
+    volumes:
+      - name: certs
+        path: /etc/ssl/certs
+    commands:
+      - while ! docker info >/dev/null 2>&1; do echo -n .; done; echo .
+      - docker build . --tag local-registry:5000/http-simple:${DRONE_COMMIT_SHA}
+      - docker push local-registry:5000/http-simple:${DRONE_COMMIT_SHA}
+
+  - name: deploy
+    image: alpine
+    commands:
+      - apk add kubectl yq
+      - cat k8s.yaml | yq '(select(.kind == "Deployment") | .spec.template.spec.containers[0].image) = "local-registry:5000/http-simple:" + env(DRONE_COMMIT_SHA)' | kubectl apply --filename -
+      - kubectl rollout status deployment http-simple --timeout=600s --watch --namespace http-simple
+    depends_on:
+      - build
+
+host_aliases:
+  - ip: 172.21.0.2
+    hostnames:
+      - gitea.src.control.localhost
+
+volumes:
+  - name: certs
+    host:
+      path: /etc/ssl/certs
